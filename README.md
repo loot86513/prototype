@@ -2,6 +2,11 @@
 
 這是一個互動式的學生學習報表系統，旨在幫助學生和教師追蹤學習進度，識別學習弱點，並提供個人化的學習建議。
 
+## 在線訪問
+
+您可以通過以下網址訪問部署好的網站：
+https://loot86513.github.io/prototype/
+
 ## 功能特點
 
 - 多科目支援（國文、英文、數學、生物、公民、歷史、地理）
@@ -36,14 +41,14 @@ open student_report.html
 
 ## 文件結構
 
-- `student_report.html` - 主要的HTML文件
+- `index.html` - 主要的HTML文件
 - `student_report_prd.md` - 產品需求文件
 - `README.md` - 專案說明文件
 - `.gitignore` - Git忽略文件
 
 ## 開發狀態
 
-目前處於原型階段，實現了基本的用戶界面和互動功能。
+目前已完成基本功能開發，並已部署到 GitHub Pages。您可以通過上方提供的網址訪問系統。
 
 ## 貢獻指南
 
