@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學生學習報表</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .status-cell { 
+            width: 150px; 
+            height: 60px; 
+            display: flex;
+            flex-direction: column; 
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+            text-align: center;
+            padding: 0.25rem 0; 
+            color: #374151; /* 確保有預設文字顏色 */
+        }
+        .status-cell > div { 
+            line-height: 1.3; 
+        }
+
+        .status-beginner { background-color: #fee2e2; color: #991b1b; }
+        .status-intermediate { background-color: #ffedd5; color: #9a3412; }
+        .status-advanced { background-color: #dcfce7; color: #166534; }
+        .status-none { background-color: #f9fafb; color: #6b7280; }
+
+        .comparison-text-high { color: #166534; font-weight: 500; } 
+        .comparison-text-medium { color: #9a3412; }                 
+        .comparison-text-low { color: #991b1b; }                   
+        .comparison-text-none { color: #6b7280; }                 
+
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        select, .button-primary, .button-secondary {
+            padding: 0.625rem 1rem;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            background-color: white;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .button-primary {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+        .button-primary:hover {
+            background-color: #4338ca;
+        }
+        .button-secondary {
+            background-color: #6b7280;
+            color: white;
+            border-color: #6b7280;
+        }
+        .button-secondary:hover {
+            background-color: #4b5563;
+        }
+        .button-link {
+            background-color: transparent;
+            color: #4f46e5;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .button-link:hover {
+            color: #4338ca;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            text-align: center;
+        }
+        th.name-header, td.name-cell { /* 名稱欄位靠左 */
+            text-align: left;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        .no-data-message {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+            font-style: italic;
+        }
+        
+        /* 層級化表格樣式 */
+        .heatmap-table .chapter-row > td:first-child,
+        .heatmap-table .section-row > td:first-child,
+        .heatmap-table .kp-row > td:first-child {
+            text-align: center; /* 圖示/選框欄置中 */
+        }
+
+        .heatmap-table .chapter-row {
+            background-color: #eef2ff; /* 淡紫色背景作為章節標示 */
+            font-weight: 600;
+        }
+        .heatmap-table .section-row {
+            background-color: #f0f9ff; /* 淡藍色背景作為小節標示 */
+        }
+        .heatmap-table .section-row > td.name-cell {
+            padding-left: 2.5rem; /* 小節縮排 */
+        }
+         .heatmap-table .section-row > td:first-child { /* 小節圖示縮排 */
+            padding-left: 1.5rem; 
+        }
+        .heatmap-table .kp-row > td.name-cell {
+            padding-left: 4rem; /* 知識點縮排 */
+        }
+        .heatmap-table .kp-row > td:first-child { /* 知識點選框縮排 */
+            padding-left: 3rem;
+        }
+
+        .toggle-icon {
+            cursor: pointer;
+            display: inline-block;
+            width: 1em; /* 確保圖示寬度一致 */
+            font-size: 0.9em;
+            margin-right: 0.5rem;
+        }
+        .toggle-icon::before {
+            content: '►'; /* 預設收合 */
+        }
+        .toggle-icon.expanded::before {
+            content: '▼'; /* 展開狀態 */
+        }
+
+        .custom-alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .custom-alert-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .custom-alert-box {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+        .custom-alert-box h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #374151;
+        }
+        .custom-alert-box p {
+            margin-bottom: 1.5rem;
+            color: #4b5563;
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
+            white-space: pre-wrap;
+        }
+        .custom-alert-box button {
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .custom-alert-box button:hover {
+            background-color: #4338ca;
+        }
+
+        #activityDetailPageContainer .detail-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            padding: 2rem;
+        }
+        #activityDetailPageContainer h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        #activityDetailPageContainer .detail-meta {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+        }
+        #activityDetailPageContainer .detail-content {
+            color: #374151;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            background-color: #f9fafb;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="reportPageContainer" class="container mx-auto max-w-7xl">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">學生學習報表</h1>
+            <p class="text-gray-600 mt-1">檢視您在各科目的學習進度與詳細記錄，並針對弱項進行練習。</p>
+        </header>
+
+        <div class="card">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="subjectFilter" class="block text-sm font-medium text-gray-700 mb-1">選擇科目：</label>
+                    <select id="subjectFilter" class="w-full">
+                        <option value="chinese">國文</option>
+                        <option value="english">英文</option>
+                        <option value="math" selected>數學</option> 
+                        <option value="science">生物</option> 
+                        <option value="social_studies">公民</option> 
+                        <option value="history">歷史</option>
+                        <option value="geography">地理</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="timePeriodFilter" class="block text-sm font-medium text-gray-700 mb-1">選擇時間段：</label>
+                    <select id="timePeriodFilter" class="w-full">
+                        <option value="grade7_sem1_exam1" selected>七上第一次段考</option> 
+                        <option value="grade7_sem1_exam2">七上第二次段考</option>
+                        <option value="grade7_sem1_full">七年級上學期</option>
+                        <option value="grade7_sem2_exam1">七下第一次段考</option>
+                        <option value="grade7_sem2_exam2">七下第二次段考</option>
+                        <option value="grade7_sem2_full">七年級下學期</option>
+                        <option value="grade8_sem1_exam1">八上第一次段考</option>
+                        <option value="grade8_sem1_full">八年級上學期</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">學習狀態熱點圖</h2>
+            <p class="text-sm text-gray-500 mb-4">勾選您不熟悉的知識點，然後點擊下方按鈕產生弱項練習卷。</p>
+            <div id="heatmapMessage" class="no-data-message hidden">目前沒有此範圍的學習狀態資料。</div>
+            <div class="table-container">
+                <table class="min-w-full divide-y divide-gray-200 heatmap-table" id="heatmapTable">
+                    <thead>
+                        <tr>
+                            <th class="w-1/12 text-center">+/-</th> 
+                            <th class="name-header w-7/12">名稱 (章節/知識點)</th> 
+                            <th class="text-center w-4/12">學習狀態 / 總體比較</th> 
+                        </tr>
+                    </thead>
+                    <tbody id="heatmapBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+            <div class="mt-6 text-right">
+                <button id="generatePracticeTestBtn" class="button-primary">智能組卷</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">學習活動記錄</h2>
+            <div id="activityLogMessage" class="no-data-message hidden">目前沒有此範圍的學習活動記錄。</div>
+            <div class="table-container">
+                <table class="min-w-full divide-y divide-gray-200" id="activityLogTable">
+                    <thead>
+                        <tr>
+                            <th>類型</th>
+                            <th>活動名稱 | 科目</th>
+                            <th>成績</th>
+                            <th>完成時間</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activityLogBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="activityDetailPageContainer" class="container mx-auto max-w-4xl hidden p-4 md:p-8">
+        <div class="detail-card">
+            <button id="backToReportBtn" class="button-secondary mb-6">&larr; 返回報表</button>
+            <h2 id="activityDetailTitle" class="text-2xl font-bold text-gray-800"></h2>
+            <div id="activityDetailMeta" class="detail-meta"></div>
+            <h3 class="text-lg font-semibold text-gray-700 mt-6 mb-2">詳細內容：</h3>
+            <div id="activityDetailContent" class="detail-content"></div>
+        </div>
+    </div>
+    <div id="customAlert" class="custom-alert-overlay">
+        <div class="custom-alert-box">
+            <h3 id="customAlertTitle">提示</h3>
+            <p id="customAlertMessage"></p>
+            <button id="customAlertCloseBtn">關閉</button>
+        </div>
+    </div>
+
+    <script>
+        // 模擬資料 - 豐富活動記錄
+        const mockData = {
+            math: {
+                grade7_sem1_exam1: {
+                    chapters: [
+                        {
+                            id: 'ch1_m_g7s1e1',
+                            name: '第一章：數的運算',
+                            sections: [
+                                {
+                                    id: 's1_1_m_g7s1e1',
+                                    name: '1-1 數線與絕對值',
+                                    knowledgePoints: [
+                                        { id: 'm_g7s1e1_kp1', name: '數線的概念與表示', status: 'advanced', comparisonStatus: '優於多數' },
+                                        { id: 'm_g7s1e1_kp2', name: '絕對值的意義與計算', status: 'intermediate', comparisonStatus: '與多數持平' },
+                                    ]
+                                },
+                                {
+                                    id: 's1_2_m_g7s1e1',
+                                    name: '1-2 整數的加減運算',
+                                    knowledgePoints: [
+                                        { id: 'm_g7s1e1_kp3', name: '正負數的加法', status: 'beginner', comparisonStatus: '落後多數' },
+                                        { id: 'm_g7s1e1_kp4', name: '正負數的減法', status: 'advanced', comparisonStatus: '優於多數' },
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            id: 'ch2_m_g7s1e1',
+                            name: '第二章：分數的運算',
+                            sections: [
+                                {
+                                    id: 's2_1_m_g7s1e1',
+                                    name: '2-1 分數的加減',
+                                    knowledgePoints: [
+                                        { id: 'm_g7s1e1_kp5', name: '同分母分數加減', status: 'none', comparisonStatus: '尚無比較資料' },
+                                        { id: 'm_g7s1e1_kp6', name: '異分母分數加減', status: 'intermediate', comparisonStatus: '與多數持平' },
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    activities: [ 
+                        { id: 'act_m_g7s1e1_1', type: '考卷', name: '七上數學：第一次段考複習', subject: '數學', score: '85分', completionTime: '2025-03-14', studentStatus: '已完成', details: '多練習絕對值應用題。' },
+                        { id: 'act_m_g7s1e1_2', type: '影片', name: '七上數學：1-1 數線教學影片', subject: '數學', score: 'N/A', completionTime: '2025-03-10 (已觀看)', studentStatus: '已完成', details: '影片重點：數線三要素、相反數概念。' },
+                        { id: 'act_m_g7s1e1_3', type: '課程', name: '七上數學：課後加強 - 整數運算', subject: '數學', score: '完成', completionTime: '2025-03-20', studentStatus: '已完成', details: '課程目標：熟練正負數加減運算。' },
+                     ]
+                },
+                grade7_sem1_exam2: { chapters: [], knowledgePoints: [], activities: [] }, 
+                grade7_sem1_full: { chapters: [], knowledgePoints: [], activities: [] },
+            },
+            chinese: { 
+                grade7_sem1_exam1: { 
+                    chapters: [], // 保持簡單，待後續更新
+                    knowledgePoints: [
+                        { id: 'c_g7s1e1_kp1', name: '七上國文：第一課 字音字形', status: 'advanced', comparisonStatus: '優於多數'},
+                        { id: 'c_g7s1e1_kp2', name: '七上國文：第二課 詞語運用', status: 'intermediate', comparisonStatus: '與多數持平'}
+                    ], 
+                    activities: [
+                        { id: 'act_c_g7s1e1_1', type: '作業', name: '七上國文：第一課形近字練習', subject: '國文', score: '甲上', completionTime: '2025-03-05', studentStatus: '已批改', details: '形近字辨識正確率高，請持續保持。' },
+                        { id: 'act_c_g7s1e1_2', type: '影片', name: '七上國文：修辭法教學 - 譬喻', subject: '國文', score: 'N/A', completionTime: '2025-03-11 (已觀看)', studentStatus: '已完成', details: '介紹明喻、暗喻、略喻的區別。' },
+                    ] 
+                }
+            },
+            english: { 
+                grade7_sem1_exam1: { 
+                    chapters: [], 
+                    knowledgePoints: [
+                        { id: 'e_g7s1e1_kp1', name: '七上英文：Unit 1 單字', status: 'advanced', comparisonStatus: '優於多數'},
+                        { id: 'e_g7s1e1_kp2', name: '七上英文：Unit 1 文法 - Be動詞', status: 'intermediate', comparisonStatus: '與多數持平'}
+                    ], 
+                    activities: [
+                         { id: 'act_e_g7s1e1_1', type: '小考', name: '七上英文：Unit 1 單字測驗', subject: '英文', score: '92分', completionTime: '2025-03-12', studentStatus: '已完成', details: '單字拼寫大致正確。' },
+                         { id: 'act_e_g7s1e1_2', type: '課程', name: '七上英文：發音練習班', subject: '英文', score: '參與證明', completionTime: '2025-03-22', studentStatus: '已完成', details: '針對 KK 音標進行練習。' },
+                    ] 
+                }
+            },
+            science: { // 生物
+                grade7_sem1_exam1: { 
+                    chapters: [], 
+                    knowledgePoints: [
+                        { id: 'sci_g7s1e1_kp1', name: '七上生物：生命現象與細胞', status: 'intermediate', comparisonStatus: '與多數持平' },
+                        { id: 'sci_g7s1e1_kp2', name: '七上生物：物質的進出與利用', status: 'beginner', comparisonStatus: '落後多數' },
+                    ], 
+                    activities: [
+                        { id: 'act_sci_g7s1e1_1', type: '實驗報告', name: '七上生物：顯微鏡觀察', subject: '生物', score: '良好', completionTime: '2025-03-18', studentStatus: '已繳交', details: '報告內容完整，繪圖精細。' },
+                        { id: 'act_sci_g7s1e1_2', type: '影片', name: '七上生物：細胞分裂過程動畫', subject: '生物', score: 'N/A', completionTime: '2025-03-20 (已觀看)', studentStatus: '已完成', details: '視覺化呈現有絲分裂各階段。' },
+                        { id: 'act_sci_g7s1e1_3', type: '測驗', name: '七上生物：細胞構造隨堂測驗', subject: '生物', score: '75分', completionTime: '2025-03-21', studentStatus: '已完成', details: '需加強細胞核與粒線體的功能記憶。' },
+                    ] 
+                } 
+            },
+            social_studies: { // 公民
+                grade7_sem1_exam1: { 
+                    chapters: [], 
+                    knowledgePoints: [
+                        { id: 'soc_g7s1e1_kp1', name: '七上公民：個人與家庭', status: 'advanced', comparisonStatus: '優於多數' },
+                        { id: 'soc_g7s1e1_kp2', name: '七上公民：學校與社區', status: 'intermediate', comparisonStatus: '與多數持平' },
+                    ], 
+                    activities: [
+                        { id: 'act_soc_g7s1e1_1', type: '報告', name: '七上公民：我的社區服務計畫', subject: '公民', score: '優', completionTime: '2025-04-02', studentStatus: '已完成', details: '內容豐富，資料搜集完整。' },
+                        { id: 'act_soc_g7s1e1_2', type: '課程', name: '七上公民：小組討論 - 友善校園', subject: '公民', score: '積極參與', completionTime: '2025-03-28', studentStatus: '已完成', details: '能提出具體建議。' },
+                    ] 
+                } 
+            },
+            history: { 
+                grade7_sem1_exam1: { 
+                    chapters: [], 
+                    knowledgePoints: [
+                        { id: 'h_g7s1e1_kp1', name: '七上歷史：史前台灣與原住民', status: 'intermediate', comparisonStatus: '與多數持平' },
+                        { id: 'h_g7s1e1_kp2', name: '七上歷史：國際競逐時期', status: 'advanced', comparisonStatus: '優於多數' },
+                    ], 
+                    activities: [
+                        { id: 'act_h_g7s1e1_1', type: '測驗', name: '七上歷史：台灣史前文化測驗', subject: '歷史', score: '88分', completionTime: '2025-03-25', studentStatus: '已完成', details: '對重要歷史事件年代掌握良好。' },
+                        { id: 'act_h_g7s1e1_2', type: '影片', name: '七上歷史：大航海時代紀錄片精華', subject: '歷史', score: 'N/A', completionTime: '2025-03-15 (已觀看)', studentStatus: '已完成', details: '了解當時歐洲國家來台背景。' },
+                    ] 
+                } 
+            },
+            geography: { 
+                grade7_sem1_exam1: { 
+                    chapters: [], 
+                    knowledgePoints: [
+                        { id: 'g_g7s1e1_kp1', name: '七上地理：認識地圖', status: 'advanced', comparisonStatus: '優於多數' },
+                        { id: 'g_g7s1e1_kp2', name: '七上地理：台灣的位置與範圍', status: 'intermediate', comparisonStatus: '與多數持平' },
+                    ], 
+                    activities: [
+                        { id: 'act_g_g7s1e1_1', type: '作業', name: '七上地理：台灣地形圖著色與標示', subject: '地理', score: '甲', completionTime: '2025-03-19', studentStatus: '已繳交', details: '地圖標示清晰，著色美觀。' },
+                        { id: 'act_g_g7s1e1_2', type: '課程', name: '七上地理：地圖判讀技巧工作坊', subject: '地理', score: '完成', completionTime: '2025-04-01', studentStatus: '已完成', details: '學習判讀等高線圖、比例尺。' },
+                    ] 
+                } 
+            },
+        };
+        
+        ['chinese', 'english', 'math', 'science', 'social_studies', 'history', 'geography'].forEach(subject => {
+            if (!mockData[subject]) mockData[subject] = {};
+            ['grade7_sem1_exam1', 'grade7_sem1_exam2', 'grade7_sem1_full', 
+             'grade7_sem2_exam1', 'grade7_sem2_exam2', 'grade7_sem2_full',
+             'grade8_sem1_exam1', 'grade8_sem1_full'].forEach(period => {
+                if (!mockData[subject][period]) {
+                    mockData[subject][period] = { chapters: [], knowledgePoints: [], activities: [] };
+                } else { 
+                    mockData[subject][period].chapters = mockData[subject][period].chapters || [];
+                    mockData[subject][period].knowledgePoints = mockData[subject][period].knowledgePoints || [];
+                    mockData[subject][period].activities = mockData[subject][period].activities || [];
+                }
+            });
+        });
+
+        // DOM 元素獲取
+        const subjectSelect = document.getElementById('subjectFilter');
+        const timePeriodSelect = document.getElementById('timePeriodFilter');
+        const heatmapBody = document.getElementById('heatmapBody');
+        const generatePracticeTestBtn = document.getElementById('generatePracticeTestBtn');
+        const heatmapTable = document.getElementById('heatmapTable');
+        const heatmapMessage = document.getElementById('heatmapMessage');
+        
+        const activityLogTable = document.getElementById('activityLogTable');
+        const activityLogMessage = document.getElementById('activityLogMessage');
+        const activityLogBody = document.getElementById('activityLogBody'); 
+
+        const reportPageContainer = document.getElementById('reportPageContainer');
+        const activityDetailPageContainer = document.getElementById('activityDetailPageContainer');
+        const activityDetailTitle = document.getElementById('activityDetailTitle');
+        const activityDetailMeta = document.getElementById('activityDetailMeta');
+        const activityDetailContent = document.getElementById('activityDetailContent');
+        const backToReportBtn = document.getElementById('backToReportBtn');
+
+        const customAlertOverlay = document.getElementById('customAlert');
+        const customAlertTitleElement = document.getElementById('customAlertTitle');
+        const customAlertMessageElement = document.getElementById('customAlertMessage');
+        const customAlertCloseBtn = document.getElementById('customAlertCloseBtn');
+
+
+        function toggleRow(rowId, type) {
+            const iconElement = document.querySelector(`.toggle-icon[data-id='${rowId}']`);
+            if (iconElement) {
+                iconElement.classList.toggle('expanded');
+            }
+
+            const childrenSelector = type === 'chapter' 
+                ? `.section-row[data-parent-chapter-id='${rowId}'], .kp-row[data-parent-chapter-id='${rowId}']` 
+                : `.kp-row[data-parent-section-id='${rowId}']`;
+            
+            document.querySelectorAll(childrenSelector).forEach(childRow => {
+                if (iconElement && iconElement.classList.contains('expanded')) {
+                    childRow.classList.remove('hidden');
+                    if (type === 'chapter' && childRow.classList.contains('section-row')) {
+                        const sectionIcon = childRow.querySelector('.toggle-icon');
+                        if (sectionIcon && !sectionIcon.classList.contains('expanded')) {
+                            document.querySelectorAll(`.kp-row[data-parent-section-id='${sectionIcon.dataset.id}']`).forEach(kpR => {
+                                kpR.classList.add('hidden');
+                            });
+                        }
+                    }
+                } else {
+                    childRow.classList.add('hidden');
+                    childRow.querySelectorAll('.toggle-icon.expanded').forEach(childIcon => {
+                         childIcon.classList.remove('expanded');
+                    });
+                    if (childRow.classList.contains('section-row') || childRow.classList.contains('chapter-row')) {
+                        const grandChildrenSelector = `.kp-row[data-parent-section-id='${childRow.dataset.id}'], .section-row[data-parent-chapter-id='${childRow.dataset.id}'], .kp-row[data-parent-chapter-id='${childRow.dataset.id}']`;
+                         document.querySelectorAll(grandChildrenSelector).forEach(gcRow => gcRow.classList.add('hidden'));
+                    }
+                }
+            });
+        }
+
+        function updateHeatmap(data) {
+            heatmapBody.innerHTML = '';
+            if (!data || ((!data.chapters || data.chapters.length === 0) && (!data.knowledgePoints || data.knowledgePoints.length === 0))) {
+                heatmapTable.classList.add('hidden');
+                heatmapMessage.classList.remove('hidden');
+                generatePracticeTestBtn.classList.add('hidden');
+                return;
+            }
+            heatmapTable.classList.remove('hidden');
+            heatmapMessage.classList.add('hidden');
+            generatePracticeTestBtn.classList.remove('hidden');
+
+            if (data.chapters && data.chapters.length > 0) {
+                data.chapters.forEach(chapter => {
+                    const chapterRow = heatmapBody.insertRow();
+                    chapterRow.classList.add('chapter-row');
+                    chapterRow.dataset.id = chapter.id;
+
+                    let cell = chapterRow.insertCell();
+                    cell.classList.add('text-center');
+                    const chapterToggle = document.createElement('span');
+                    chapterToggle.classList.add('toggle-icon');
+                    chapterToggle.dataset.id = chapter.id;
+                    chapterToggle.onclick = () => toggleRow(chapter.id, 'chapter');
+                    cell.appendChild(chapterToggle);
+
+                    cell = chapterRow.insertCell();
+                    cell.classList.add('name-cell');
+                    cell.textContent = chapter.name;
+                    
+                    chapterRow.insertCell(); 
+
+                    if (chapter.sections && chapter.sections.length > 0) {
+                        chapter.sections.forEach(section => {
+                            const sectionRow = heatmapBody.insertRow();
+                            sectionRow.classList.add('section-row', 'hidden'); 
+                            sectionRow.dataset.id = section.id;
+                            sectionRow.dataset.parentChapterId = chapter.id;
+
+                            cell = sectionRow.insertCell();
+                            cell.classList.add('text-center');
+                            const sectionToggle = document.createElement('span');
+                            sectionToggle.classList.add('toggle-icon');
+                            sectionToggle.dataset.id = section.id;
+                            sectionToggle.onclick = () => toggleRow(section.id, 'section');
+                            cell.appendChild(sectionToggle);
+
+                            cell = sectionRow.insertCell();
+                            cell.classList.add('name-cell');
+                            cell.textContent = section.name;
+
+                            sectionRow.insertCell(); 
+
+                            if (section.knowledgePoints && section.knowledgePoints.length > 0) {
+                                section.knowledgePoints.forEach(kp => {
+                                    const kpRow = heatmapBody.insertRow();
+                                    kpRow.classList.add('kp-row', 'hidden'); 
+                                    kpRow.dataset.id = kp.id;
+                                    kpRow.dataset.parentSectionId = section.id;
+                                    kpRow.dataset.parentChapterId = chapter.id; 
+
+                                    cell = kpRow.insertCell();
+                                    cell.classList.add('text-center');
+                                    const checkbox = document.createElement('input');
+                                    checkbox.type = 'checkbox';
+                                    checkbox.classList.add('form-checkbox', 'h-5', 'w-5', 'text-indigo-600', 'rounded', 'border-gray-300', 'focus:ring-indigo-500');
+                                    checkbox.setAttribute('data-kp-id', kp.id);
+                                    checkbox.setAttribute('data-kp-name', kp.name);
+                                    cell.appendChild(checkbox);
+
+                                    cell = kpRow.insertCell();
+                                    cell.classList.add('name-cell');
+                                    cell.textContent = kp.name;
+
+                                    const cellStatusAndComparison = kpRow.insertCell();
+                                    cellStatusAndComparison.classList.add('status-cell');
+                                    let statusText = '';
+                                    let statusBgClass = 'status-none';
+                                    switch (kp.status) {
+                                        case 'beginner': statusText = '初階'; statusBgClass = 'status-beginner'; break;
+                                        case 'intermediate': statusText = '進階'; statusBgClass = 'status-intermediate'; break;
+                                        case 'advanced': statusText = '精熟'; statusBgClass = 'status-advanced'; break;
+                                        default: statusText = '未學習'; break;
+                                    }
+                                    cellStatusAndComparison.classList.add(statusBgClass);
+                                    const statusDiv = document.createElement('div');
+                                    statusDiv.textContent = statusText;
+                                    const comparisonDiv = document.createElement('div');
+                                    comparisonDiv.textContent = kp.comparisonStatus || 'N/A';
+                                    let comparisonTextClass = 'comparison-text-none';
+                                    if (kp.comparisonStatus === '優於多數') comparisonTextClass = 'comparison-text-high';
+                                    else if (kp.comparisonStatus === '與多數持平') comparisonTextClass = 'comparison-text-medium';
+                                    else if (kp.comparisonStatus === '落後多數') comparisonTextClass = 'comparison-text-low';
+                                    comparisonDiv.classList.add(comparisonTextClass);
+                                    cellStatusAndComparison.appendChild(statusDiv);
+                                    cellStatusAndComparison.appendChild(comparisonDiv);
+                                });
+                            }
+                        });
+                    }
+                });
+            } else if (data.knowledgePoints && data.knowledgePoints.length > 0) { 
+                data.knowledgePoints.forEach(kp => {
+                    const kpRow = heatmapBody.insertRow();
+                    kpRow.classList.add('kp-row');
+
+                    let cell = kpRow.insertCell(); 
+                    cell.classList.add('text-center');
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.classList.add('form-checkbox', 'h-5', 'w-5', 'text-indigo-600', 'rounded', 'border-gray-300', 'focus:ring-indigo-500');
+                    checkbox.setAttribute('data-kp-id', kp.id);
+                    checkbox.setAttribute('data-kp-name', kp.name);
+                    cell.appendChild(checkbox);
+
+                    cell = kpRow.insertCell(); 
+                    cell.classList.add('name-cell');
+                    cell.textContent = kp.name;
+                    
+                    const cellStatusAndComparison = kpRow.insertCell();
+                    cellStatusAndComparison.classList.add('status-cell');
+                    let statusText = '';
+                    let statusBgClass = 'status-none';
+                    switch (kp.status) {
+                        case 'beginner': statusText = '初階'; statusBgClass = 'status-beginner'; break;
+                        case 'intermediate': statusText = '進階'; statusBgClass = 'status-intermediate'; break;
+                        case 'advanced': statusText = '精熟'; statusBgClass = 'status-advanced'; break;
+                        default: statusText = '未學習'; break;
+                    }
+                    cellStatusAndComparison.classList.add(statusBgClass);
+                    const statusDiv = document.createElement('div');
+                    statusDiv.textContent = statusText;
+                    const comparisonDiv = document.createElement('div');
+                    comparisonDiv.textContent = kp.comparisonStatus || 'N/A';
+                    let comparisonTextClass = 'comparison-text-none';
+                    if (kp.comparisonStatus === '優於多數') comparisonTextClass = 'comparison-text-high';
+                    else if (kp.comparisonStatus === '與多數持平') comparisonTextClass = 'comparison-text-medium';
+                    else if (kp.comparisonStatus === '落後多數') comparisonTextClass = 'comparison-text-low';
+                    comparisonDiv.classList.add(comparisonTextClass);
+                    cellStatusAndComparison.appendChild(statusDiv);
+                                    cellStatusAndComparison.appendChild(comparisonDiv);
+                });
+            }
+        }
+        
+        function showCustomAlert(title, message) {
+            customAlertTitleElement.textContent = title;
+            customAlertMessageElement.innerHTML = message;
+            customAlertOverlay.classList.add('visible');
+        }
+
+        customAlertCloseBtn.addEventListener('click', () => {
+            customAlertOverlay.classList.remove('visible');
+        });
+        customAlertOverlay.addEventListener('click', (event) => {
+            if (event.target === customAlertOverlay) {
+                customAlertOverlay.classList.remove('visible');
+            }
+        });
+
+        function updateActivityLog(data) { 
+            if (!activityLogBody) { 
+                console.error("activityLogBody is not defined in updateActivityLog");
+                return;
+            }
+            activityLogBody.innerHTML = '';
+            const activities = data.activities || []; 
+
+            if (activities.length === 0) {
+                if(activityLogTable) activityLogTable.classList.add('hidden');
+                if(activityLogMessage) activityLogMessage.classList.remove('hidden');
+                return;
+            }
+            if(activityLogTable) activityLogTable.classList.remove('hidden');
+            if(activityLogMessage) activityLogMessage.classList.add('hidden');
+
+            activities.forEach(activity => {
+                const row = activityLogBody.insertRow();
+                row.insertCell().textContent = activity.type;
+                row.insertCell().textContent = `${activity.name} | ${activity.subject}`;
+                row.insertCell().textContent = activity.score;
+                row.insertCell().textContent = activity.completionTime;
+                row.insertCell().textContent = activity.studentStatus;
+
+                const cellAction = row.insertCell();
+                cellAction.classList.add('text-center');
+                const viewButton = document.createElement('button');
+                viewButton.textContent = '查看';
+                viewButton.classList.add('button-link');
+                viewButton.onclick = () => {
+                    showActivityDetails(activity);
+                };
+                cellAction.appendChild(viewButton);
+            });
+        }
+        
+        function showActivityDetails(activity) {
+            if(reportPageContainer) reportPageContainer.classList.add('hidden');
+            if(activityDetailPageContainer) activityDetailPageContainer.classList.remove('hidden');
+
+            if(activityDetailTitle) activityDetailTitle.textContent = `${activity.type}：${activity.name}`;
+            let metaInfo = `科目：${activity.subject}`;
+            if (activity.score !== 'N/A') metaInfo += ` | 成績：${activity.score}`;
+            metaInfo += ` | 完成時間：${activity.completionTime} | 狀態：${activity.studentStatus}`;
+            if(activityDetailMeta) activityDetailMeta.textContent = metaInfo;
+            if(activityDetailContent) activityDetailContent.textContent = activity.details || '尚無詳細說明。';
+        }
+
+        function showReportPage() {
+            if(activityDetailPageContainer) activityDetailPageContainer.classList.add('hidden');
+            if(reportPageContainer) reportPageContainer.classList.remove('hidden');
+        }
+        
+        function loadData() {
+            const selectedSubjectValue = subjectSelect.value;
+            const selectedTimePeriodValue = timePeriodSelect.value;
+            
+            const subjectData = mockData[selectedSubjectValue] || {};
+            const timePeriodData = subjectData[selectedTimePeriodValue] || { chapters: [], knowledgePoints: [], activities: [] };
+
+            updateHeatmap(timePeriodData); 
+            
+            const activitiesData = timePeriodData.activities || []; 
+            updateActivityLog({ activities: activitiesData }); 
+        }
+
+        generatePracticeTestBtn.addEventListener('click', () => {
+            const selectedKps = [];
+            const checkboxes = heatmapBody.querySelectorAll('.kp-row:not(.hidden) input[type="checkbox"]:checked');
+            checkboxes.forEach(checkbox => {
+                selectedKps.push(checkbox.getAttribute('data-kp-name'));
+            });
+
+            if (selectedKps.length === 0) {
+                showCustomAlert('提示', '請至少選擇一個知識點來組卷。');
+            } else {
+                let message = '已選擇以下弱項知識點準備組卷：<br><br>';
+                selectedKps.forEach(kp => { message += `- ${kp}<br>`; });
+                showCustomAlert('弱項練習考卷', message);
+            }
+        });
+
+        subjectSelect.addEventListener('change', loadData);
+        timePeriodSelect.addEventListener('change', loadData);
+        
+        if (backToReportBtn) { 
+             backToReportBtn.addEventListener('click', showReportPage);
+        }
+
+        loadData(); 
+    </script>
+</body>
+</html> 
